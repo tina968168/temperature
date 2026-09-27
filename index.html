@@ -1,0 +1,738 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>body{margin:0}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>温度</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;700&family=ZCOOL+KuaiLe&family=Ma+Shan+Zheng&family=Rubik+Mono+One&display=swap">
+<style>
+:root{
+  color-scheme:dark;
+  --outside:#121316;
+  --outside-ink:#d9dbe0;
+  --outside-dim:#7b808a;
+  --line:#2a2d33;
+  /* live, driven by the temperature */
+  --paper:#e7e9ec;
+  --ink:#1d2127;
+  --card:#ffffff;
+  --acc:#1d2127;
+  --pink:#ff48b0; --yellow:#ffe800; --blue:#0078bf; --green:#00a95c;
+}
+html,body{height:100%}
+body{background:var(--outside);color:var(--outside-ink);margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  padding-block:12px;padding-inline:16px;box-sizing:border-box;font-family:"IBM Plex Mono","Noto Sans SC",monospace;font-size:13px}
+.顶,.底{width:min(100%,1280px,calc((100vh - 110px) * 1.7778));display:flex;align-items:center;justify-content:space-between;gap:12px}
+.顶 h1{margin:0;font:500 15px "IBM Plex Mono","Noto Sans SC",monospace;letter-spacing:.08em;display:flex;align-items:center;gap:10px}
+.顶 small{color:var(--outside-dim);letter-spacing:.06em}
+.标 svg{width:33px;height:21px;display:block;animation:跳 2.8s infinite}
+.标 .眼{animation:眨 4.2s infinite;transform-origin:50% 30%;transform-box:fill-box}
+@keyframes 跳{0%,70%,100%{transform:translateY(0)}78%{transform:translateY(-6px)}86%{transform:translateY(0)}90%{transform:translateY(-2px)}}
+@keyframes 眨{0%,92%,100%{transform:scaleY(1)}95%{transform:scaleY(.1)}}
+.底 button,.卡 button,.选 button.抽{font:inherit;cursor:pointer}
+.底 button{color:var(--outside-ink);background:transparent;border:1px solid var(--line);border-radius:4px;padding:6px 12px;letter-spacing:.06em}
+.底 button[aria-pressed="false"]{color:var(--outside-dim)}
+button:focus-visible,[role="slider"]:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
+
+#台{position:relative;width:min(100%,1280px,calc((100vh - 110px) * 1.7778));aspect-ratio:16/9;container-type:inline-size;overflow:hidden;border-radius:10px;
+  box-shadow:0 0 0 1px var(--line),0 30px 80px rgba(0,0,0,.5);touch-action:none;user-select:none;-webkit-user-select:none}
+#画{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab}
+#层{position:absolute;inset:0;pointer-events:none;font-size:clamp(9px,1.3cqw,17px)}
+#层>*{pointer-events:auto}
+
+/* ---------- dial ---------- */
+#表{position:absolute;right:2.2%;top:4%;display:flex;align-items:center;gap:.9em;color:var(--ink)}
+.钮{width:5.4em;height:5.4em;border-radius:50%;position:relative;cursor:grab;touch-action:none;
+  background:radial-gradient(circle at 35% 30%,#fff,var(--card) 40%,color-mix(in srgb,var(--card) 70%,var(--ink)) 100%);
+  box-shadow:0 0 0 2px var(--ink),.25em .3em 0 0 var(--acc)}
+.钮 .针{position:absolute;left:50%;top:50%;width:.3em;height:2.2em;margin-left:-.15em;margin-top:-2.2em;background:var(--ink);border-radius:.2em;transform-origin:50% 100%}
+.钮 .刻{position:absolute;inset:-.7em;border-radius:50%;border:1px dashed color-mix(in srgb,var(--ink) 40%,transparent)}
+.眼们{position:absolute;left:0;right:0;top:58%;display:none;justify-content:center;gap:.5em}
+.眼们 i{width:1.25em;height:1.25em;border-radius:50%;background:#fff;border:2px solid var(--ink);position:relative;display:block}
+.眼们 i b{position:absolute;left:50%;top:50%;width:.55em;height:.55em;margin:-.275em;border-radius:50%;background:var(--ink)}
+#表.睁 .眼们{display:flex}
+.读{display:flex;flex-direction:column;line-height:1.1}
+.读 span{font-size:.8em;letter-spacing:.12em;opacity:.7}
+.读 b{font:500 2.1em "IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
+body[data-温="hot"] .读 b{font-family:"Rubik Mono One","IBM Plex Mono",monospace;font-weight:400;color:var(--pink)}
+.计{width:.5em;height:5.4em;border:2px solid var(--ink);border-radius:1em;position:relative;overflow:hidden;background:var(--card)}
+.计 i{position:absolute;left:0;right:0;bottom:0;background:var(--pink);display:block}
+body[data-温="cold"] .计 i{background:var(--ink)}
+body[data-温="hot"] #表{animation:抖 .9s infinite}
+@keyframes 抖{0%,100%{transform:rotate(0)}25%{transform:rotate(-1.5deg)}75%{transform:rotate(1.2deg) translateY(1px)}}
+
+/* ---------- candidate panel ---------- */
+.选{position:absolute;right:2.2%;top:22%;width:35%;padding:1em 1.1em;box-sizing:border-box;color:var(--ink);background:var(--card);
+  border:1.5px solid var(--ink);transition:transform .35s cubic-bezier(.3,1.4,.5,1),opacity .25s}
+.选[hidden]{display:block!important;transform:translateX(120%);opacity:0;pointer-events:none}
+.选 h2{margin:0 0 .6em;font:500 .85em "IBM Plex Mono","Noto Sans SC",monospace;letter-spacing:.14em;display:flex;justify-content:space-between}
+.选 ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.35em}
+.选 li button{all:unset;box-sizing:border-box;cursor:pointer;width:100%;display:grid;grid-template-columns:7.2em 1fr 3.6em;align-items:center;gap:.6em;padding:.28em .4em;border-radius:3px}
+.选 li button:hover,.选 li button.亮{background:color-mix(in srgb,var(--ink) 10%,transparent)}
+.选 li button:focus-visible{outline:2px solid var(--pink)}
+.选 .词{font:500 1.05em "Noto Sans SC",sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.选 .条{height:.62em;background:color-mix(in srgb,var(--ink) 12%,transparent);position:relative}
+.选 .条 i{position:absolute;left:0;top:0;bottom:0;background:var(--ink);display:block;transition:width .25s}
+.选 .率{text-align:right;font-variant-numeric:tabular-nums;font-size:.9em}
+.选 .冷{font-size:.7em;margin-left:.4em;padding:0 .3em;border:1px solid currentColor;border-radius:2px;opacity:.75}
+.选 .抽{margin-top:.8em;width:100%;padding:.55em;background:transparent;border:1.5px dashed var(--ink);color:var(--ink);letter-spacing:.1em}
+body[data-温="warm"] .选{border-radius:8px}
+body[data-温="hot"] .选{background:var(--yellow);border:2.5px solid var(--ink);box-shadow:.5em .5em 0 var(--pink);transform:rotate(-1.4deg);font-family:"ZCOOL KuaiLe","Noto Sans SC",sans-serif}
+body[data-温="hot"] .选 .词{font-family:"ZCOOL KuaiLe","Noto Sans SC",sans-serif;font-weight:400;font-size:1.2em}
+body[data-温="hot"] .选 .条 i{background:var(--blue)}
+body[data-温="hot"] .选 li:nth-child(odd) button{transform:rotate(.6deg)}
+body[data-温="hot"] .选 li:nth-child(even) button{transform:rotate(-.8deg)}
+body[data-温="hot"] .选 .抽{border-style:solid;background:var(--pink);color:#fff;border-color:var(--ink)}
+
+/* ---------- cards: question / poem / book ---------- */
+.卡{position:absolute;color:var(--ink);background:var(--card);border:1.5px solid var(--ink);padding:1.2em 1.4em;box-sizing:border-box}
+.卡 p{margin:0 0 .9em;line-height:1.55}
+.卡 .行{display:flex;gap:.6em;flex-wrap:wrap}
+.卡 button{background:transparent;color:var(--ink);border:1.5px solid var(--ink);padding:.5em 1em;border-radius:3px;letter-spacing:.06em}
+.卡 button:hover{background:var(--ink);color:var(--card)}
+body[data-温="hot"] .卡{box-shadow:.5em .5em 0 var(--blue);border-width:2.5px;font-family:"ZCOOL KuaiLe","Noto Sans SC",sans-serif}
+body[data-温="hot"] .卡 button{background:var(--yellow);border-width:2px}
+#问{left:50%;top:50%;width:46%;transform:translate(-50%,-58%)}
+#问 .谁{font-size:.8em;letter-spacing:.14em;opacity:.65;margin-bottom:.6em}
+#诗{left:4%;top:8%;width:56%;max-height:84%;overflow:auto}
+#诗 h2{margin:0 0 .5em;font:500 .85em "IBM Plex Mono",monospace;letter-spacing:.16em}
+#诗 .句{font-size:1.5em;line-height:1.9;margin:0 0 .2em}
+#诗 .句 span{padding:.05em .18em;margin-right:.08em;border-radius:3px;display:inline-block}
+#诗 .账{font-size:.85em;line-height:1.7;margin:1em 0;border-top:1px dashed var(--ink);padding-top:.8em}
+#诗 .评{font-size:1.05em;margin-bottom:1em}
+#本{inset:5%;overflow:auto}
+#本 h2{margin:0 0 1em;font:500 .9em "IBM Plex Mono",monospace;letter-spacing:.16em;display:flex;justify-content:space-between;align-items:center}
+#本 article{border-top:1px dashed var(--ink);padding:.8em 0}
+#本 article .日{font-size:.75em;opacity:.6}
+#本 article .文{font-size:1.15em;line-height:1.7}
+#本 article .注{font-size:.9em;margin-top:.3em}
+#本 article .注 em{font-style:normal;opacity:.6}
+#提{position:absolute;right:2%;bottom:1.6%;text-align:right;color:var(--ink);font-size:.78em;letter-spacing:.06em;opacity:.55;pointer-events:none}
+.看不见{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+@media (prefers-reduced-motion: reduce){ body[data-温="hot"] #表{animation:none} .标 svg{animation:none} }
+</style>
+
+<div class="顶">
+  <h1><span class="标" aria-hidden="true">
+    <svg viewBox="0 0 11 7" shape-rendering="crispEdges"><rect x="1" y="0" width="9" height="5" fill="#d97757"/><rect x="0" y="2" width="1" height="2" fill="#d97757"/><rect x="10" y="2" width="1" height="2" fill="#d97757"/><rect x="1" y="5" width="1" height="2" fill="#d97757"/><rect x="3" y="5" width="1" height="2" fill="#d97757"/><rect x="6" y="5" width="1" height="2" fill="#d97757"/><rect x="8" y="5" width="1" height="2" fill="#d97757"/><g class="眼"><rect x="3" y="1" width="1" height="2" fill="#1a1a1a"/><rect x="7" y="1" width="1" height="2" fill="#1a1a1a"/></g></svg>
+  </span>温度 · TEMPERATURE</h1>
+  <small>一件关于"冷门"的作品</small>
+</div>
+
+<div id="台">
+  <canvas id="画" aria-label="互动作品：你调节小橘的温度，一个词一个词地写三句话。选中的词从天上掉下来，小橘把它推进句子里。"></canvas>
+  <div id="层">
+    <div id="表">
+      <div class="读"><span>温度</span><b id="T值">1.00</b></div>
+      <div class="钮" id="钮" role="slider" tabindex="0" aria-label="温度" aria-valuemin="0.1" aria-valuemax="2" aria-valuenow="1">
+        <div class="刻"></div><div class="针" id="针"></div>
+        <div class="眼们"><i><b></b></i><i><b></b></i></div>
+      </div>
+      <div class="计"><i id="汞"></i></div>
+    </div>
+    <section class="选" id="选" hidden aria-live="polite">
+      <h2><span id="选题">下一个词</span><span id="选序"></span></h2>
+      <ol id="候"></ol>
+      <button class="抽" id="抽" type="button">让小橘抽签</button>
+    </section>
+    <div class="卡" id="问" hidden><div class="谁">小橘问你</div><p id="问话"></p><div class="行" id="问钮"></div></div>
+    <div class="卡" id="诗" hidden></div>
+    <div class="卡" id="本" hidden></div>
+    <div id="提">小橘可以抓起来扔 · 拧右上角的旋钮</div>
+  </div>
+</div>
+
+<div class="底">
+  <span style="color:var(--outside-dim);letter-spacing:.06em">温度低：挑最可能的词。温度高：敢挑不太可能的。</span>
+  <span style="display:flex;gap:8px">
+    <button id="声" type="button" aria-pressed="true">声音 开</button>
+    <button id="重" type="button">重新开始</button>
+  </span>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.20.0/matter.min.js"></script>
+<script>
+"use strict";
+const {Engine,Bodies,Body,Composite,Events}=Matter;
+const $=s=>document.querySelector(s);
+const cv=$("#画"), g=cv.getContext("2d");
+const W=1280,H=720,FLOOR=660;
+const 慢=matchMedia("(prefers-reduced-motion: reduce)").matches;
+const clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
+const lerp=(a,b,k)=>a+(b-a)*k;
+const smooth=k=>k*k*(3-2*k);
+const rnd=(a,b)=>a+Math.random()*(b-a);
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+const hex=h=>[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];
+const mix=(a,b,k)=>{const A=hex(a),B=hex(b);return `rgb(${A.map((v,i)=>Math.round(lerp(v,B[i],k))).join(",")})`};
+const RISO=["#ff48b0","#ffe800","#0078bf","#00a95c","#ff6c2f"];
+
+// ================= sizing =================
+let S=1, 帧宽=0;
+function 尺(){ const dpr=Math.min(2,devicePixelRatio||1), r=cv.getBoundingClientRect();
+  cv.width=Math.round(r.width*dpr); cv.height=Math.round(r.height*dpr); S=cv.width/W; }
+addEventListener("resize",尺); 尺();
+
+// ================= temperature =================
+let T=1.0, 加温=0;              // 加温: extra visual heat from mutations
+const VT=()=>clamp((T-0.1)/1.9+加温,0,1.3);
+function 设温(t,静默){ T=clamp(Math.round(t*100)/100,0.1,2); 画表(); if(!静默) 刷新候(); }
+function 画表(){
+  $("#T值").textContent=T.toFixed(2);
+  const a=-135+270*(T-0.1)/1.9; $("#针").style.transform=`rotate(${a}deg)`;
+  $("#汞").style.height=(100*(T-0.1)/1.9)+"%";
+  $("#钮").setAttribute("aria-valuenow",T.toFixed(2));
+}
+{ // dial interaction
+  const 钮=$("#钮"); let 拧=false;
+  const 角温=e=>{ const r=钮.getBoundingClientRect(), cx=r.left+r.width/2, cy=r.top+r.height/2;
+    let a=Math.atan2(e.clientX-cx,-(e.clientY-cy))*180/Math.PI; a=clamp(a,-135,135); 设温(0.1+(a+135)/270*1.9); };
+  钮.addEventListener("pointerdown",e=>{拧=true; 钮.setPointerCapture(e.pointerId); 角温(e); 声.叮(900)});
+  钮.addEventListener("pointermove",e=>{ if(拧) 角温(e) });
+  钮.addEventListener("pointerup",()=>拧=false);
+  钮.addEventListener("keydown",e=>{ const d={ArrowUp:.05,ArrowRight:.05,ArrowDown:-.05,ArrowLeft:-.05}[e.key]; if(d){设温(T+d);e.preventDefault()} });
+}
+
+// ================= the three sentences (hand-made candidates; p = probability at temperature 1) =================
+const 句库=[
+  { 题:"第一句", 槽:[
+    [["我",.38],["你",.22],["小橘",.16],["雨",.10],["一只拖鞋",.06],["月亮",.05],["整座城市",.03]],
+    [["慢慢地",.34],["突然",.24],["偷偷地",.16],["倒着",.10],["用尾巴",.08],["在水底下",.05],["以光速",.03]],
+    [["回家了",.36],["睡着了",.22],["唱起歌来",.16],["打开了门",.11],["变成了一封信",.08],["掉进了茶杯",.05],["长出了翅膀",.02]] ]},
+  { 题:"第二句", 槽:[
+    [["晚上",.36],["下午",.22],["周末",.16],["下雨的时候",.12],["很久以前",.07],["冰箱打开的时候",.05],["第十三个小时",.02]],
+    [["路灯",.34],["窗户",.22],["猫",.16],["所有的钥匙",.12],["一千个问号",.08],["我的影子",.05],["地图",.03]],
+    [["亮了",.38],["在发呆",.22],["在说悄悄话",.16],["开始排队",.11],["偷偷搬家",.08],["学会了游泳",.04],["向月亮借了一点钱",.01]] ]},
+  { 题:"第三句", 槽:[
+    [["所以",.40],["然后",.26],["后来",.16],["于是",.10],["不过",.05],["据说",.03]],
+    [["我们",.36],["我",.24],["你",.18],["小橘",.12],["没有人",.06],["一整个夏天",.04]],
+    [["去睡觉了",.34],["笑了",.24],["决定出门",.16],["把它写了下来",.12],["给星星回了信",.08],["在云上排队",.04],["变成了低概率",.02]] ]},
+];
+const 标点=[["。",.80],["！",.15],["……",.05]];
+function 按温(list,t){ const w=list.map(([s,p])=>Math.pow(p,1/t)), z=w.reduce((a,b)=>a+b,0); return w.map(v=>v/z) }
+function 抽样(ps){ let r=Math.random(), i=0; for(;i<ps.length;i++){ r-=ps[i]; if(r<=0) return i } return ps.length-1 }
+
+// ================= physics =================
+const engine=Engine.create(); engine.gravity.y=1;
+const world=engine.world;
+const 地=Bodies.rectangle(W/2,FLOOR+40,W*3,80,{isStatic:true,friction:.9,label:"floor"});
+const 左墙=Bodies.rectangle(-40,H/2-600,80,H*4,{isStatic:true,label:"wall"});
+const 右墙=Bodies.rectangle(W+40,H/2-600,80,H*4,{isStatic:true,label:"wall"});
+const 顶板=Bodies.rectangle(W/2,-40,W*3,80,{isStatic:true,label:"ceiling"});
+Composite.add(world,[地,左墙,右墙]);
+
+const CW=66,CH=42;
+let 橘=造橘(W/2,FLOOR-CH/2);
+function 造橘(x,y){ const b=Bodies.rectangle(x,y,CW,CH,{friction:.6,frictionAir:.02,restitution:.1,label:"clawd",inertia:Infinity,density:.004}); Composite.add(world,b); return b }
+const 橘态={模式:"free",向:1,晕:0,话:"",话时:0,帽:false,张嘴:0,走步:0,着地:false,闲:0};
+
+// blocks
+const 块们=[];      // {body,text,kind,w,h,style,placed}
+function 量(text,font){ g.save(); g.font=font; const w=g.measureText(text).width; g.restore(); return w }
+function 选风格(vt){
+  if(vt<.35) return {bg:"#ffffff",fg:"#1d2127",line:"#1d2127",font:'500 30px "IBM Plex Mono","Noto Sans SC",monospace',lean:0,shadow:null};
+  if(vt<.75) return {bg:pick(["#dfe6ee","#efe6d8","#e3ecdf"]),fg:"#1d2127",line:"#1d2127",font:'500 32px "Noto Sans SC",sans-serif',lean:rnd(-.04,.04),shadow:null};
+  const bg=pick(RISO); let sh=pick(RISO); if(sh===bg) sh="#1d2127";
+  return {bg,fg:bg==="#0078bf"||bg==="#00a95c"?"#ffffff":"#1d2127",line:"#1d2127",font:(Math.random()<.5?'36px "ZCOOL KuaiLe"':'40px "Ma Shan Zheng"')+',"Noto Sans SC",sans-serif',lean:rnd(-.14,.14),shadow:sh};
+}
+function 造块(text,kind,x,y,style){
+  const font=kind==="junk"?'400 20px "IBM Plex Mono","Noto Sans SC",monospace':style.font;
+  const h=kind==="junk"?40:64, w=Math.max(kind==="junk"?44:64,量(text,font)+(kind==="junk"?22:40));
+  const body=Bodies.rectangle(x,y,w,h,{chamfer:{radius:kind==="junk"?4:8},restitution:.22,friction:.7,density:kind==="junk"?.0012:.002,label:"block"});
+  Body.setAngle(body,kind==="junk"?rnd(-.5,.5):(style?.lean||0)*3); Body.setAngularVelocity(body,rnd(-.05,.05));
+  const 块={body,text,kind,w,h,font,style:style||{bg:"#f3f4f6",fg:"#8a9099",line:"#9aa0a8"},placed:false};
+  body.plugin.块=块; 块们.push(块); Composite.add(world,body); return 块;
+}
+function 清块(){ 块们.splice(0).forEach(b=>Composite.remove(world,b.body)); if(月) {Composite.remove(world,月);月=null} }
+
+// collisions: grounding, sounds, dizzy landings
+let 上响=0;
+Events.on(engine,"collisionStart",e=>{
+  for(const p of e.pairs){
+    const a=p.bodyA,b=p.bodyB, v=Math.hypot(a.velocity.x-b.velocity.x,a.velocity.y-b.velocity.y);
+    if((a===橘||b===橘)&&v>11&&橘.speed>9&&橘态.模式!=="drag"){ 橘态.晕=1.4; 说(pick(["晕……","哎哟","我看见星星了"]),1.6); 声.咚(90) }
+    const now=performance.now();
+    if(v>2.2&&now-上响>45){ 上响=now; const 块=(a.plugin.块||b.plugin.块); if(块) 声.嗒(块.kind==="junk"?1400:700+Math.random()*300,Math.min(1,v/12)) }
+  }
+});
+Events.on(engine,"collisionActive",e=>{
+  for(const p of e.pairs){ const o=p.bodyA===橘?p.bodyB:p.bodyB===橘?p.bodyA:null; if(!o) continue;
+    const 下=engine.gravity.y>=0? o.position.y>橘.position.y+8 : o.position.y<橘.position.y-8; if(下) 橘态.着地=true }
+});
+
+// ================= mutations =================
+const 变异表=["重力反转","地板变成了海","颜色炸开了","下起了百分号雨","小橘戴上了派对帽","月亮掉下来了","旋钮睁开了眼睛","字开始跳舞"];
+let 变异序=0, 反转=0, 海=0, 雨=[], 月=null, 跳舞=false, 章=null;
+function 变异(){
+  const 名=变异表[变异序%变异表.length]; 变异序++;
+  章={字:名,t:0};
+  声.变();
+  if(名==="重力反转"){ 反转=6.5; engine.gravity.y=-1; Composite.add(world,顶板); 说("啊啊啊我在天花板上",2.4) }
+  if(名==="地板变成了海"){ 海=1; 说("我会游泳！",2) }
+  if(名==="颜色炸开了"){ 加温=Math.min(.5,加温+.3); 说("好多颜色",1.6) }
+  if(名==="下起了百分号雨"){ for(let i=0;i<120;i++) 雨.push({x:rnd(0,W),y:rnd(-700,-10),v:rnd(160,320),r:rnd(-3,3),c:pick(RISO),s:rnd(16,34)}) }
+  if(名==="小橘戴上了派对帽"){ 橘态.帽=true; 说("这是给我的吗",1.8) }
+  if(名==="月亮掉下来了"){ 月=Bodies.circle(rnd(900,1150),-120,40,{restitution:.35,friction:.4,density:.003,label:"moon"}); Composite.add(world,月) }
+  if(名==="旋钮睁开了眼睛"){ $("#表").classList.add("睁") }
+  if(名==="字开始跳舞"){ 跳舞=true }
+}
+function 撤变异(){ 反转=0; engine.gravity.y=1; engine.gravity.x=0; Composite.remove(world,顶板); 海=0; 雨=[]; 跳舞=false; 橘态.帽=false; 加温=0; 变异序=0; $("#表").classList.remove("睁") }
+
+// ================= speech =================
+function 说(字,秒=2.2){ 橘态.话=字; 橘态.话时=秒 }
+const 戳话={冷:["请选择概率最高的选项。","温度过低，一切正常。","我在认真工作。","别戳，我在排队。"],
+            温:["嗯？","再戳我就选个奇怪的。","今天的风有 37% 的可能是甜的。","你想要哪个词？"],
+            热:["我想吃掉那个百分号！","重力是谁发明的？","嘿嘿嘿嘿。","我刚才看见一个 0.3% 在跳舞。","把旋钮再拧一点点——"]};
+
+// ================= coroutine helpers =================
+const 等=[]; let 钟=0;
+const until=fn=>new Promise(r=>等.push({fn,r}));
+const wait=s=>{ const t=钟+s; return until(()=>钟>=t) };
+
+// ================= UI: question card =================
+function 问(话,选项){
+  return new Promise(res=>{
+    $("#问话").textContent=话; const box=$("#问钮"); box.innerHTML="";
+    选项.forEach(([字,值])=>{ const b=document.createElement("button"); b.type="button"; b.textContent=字;
+      b.onclick=()=>{ 声.开(); 声.叮(660); $("#问").hidden=true; res(值) }; box.appendChild(b) });
+    $("#问").hidden=false; box.firstChild.focus({preventScroll:true});
+  });
+}
+
+// ================= UI: candidates =================
+let 当前槽=null, 选定=null;
+function 刷新候(){
+  if(!当前槽) return;
+  const ps=按温(当前槽.list,T); 当前槽.ps=ps;
+  [...$("#候").children].forEach((li,i)=>{ li.querySelector(".条 i").style.width=(ps[i]*100).toFixed(1)+"%";
+    li.querySelector(".率").textContent=(ps[i]*100<1?(ps[i]*100).toFixed(2):(ps[i]*100).toFixed(1))+"%";
+    li.querySelector(".冷").hidden=!(ps[i]<.1) });
+}
+function 选词(题,序,list){
+  return new Promise(res=>{
+    当前槽={list,ps:null}; $("#选题").textContent=题; $("#选序").textContent=序;
+    const ol=$("#候"); ol.innerHTML="";
+    list.forEach(([字],i)=>{ const li=document.createElement("li");
+      li.innerHTML=`<button type="button"><span class="词"></span><span class="条"><i></i></span><span class="率"></span></button>`;
+      li.querySelector(".词").textContent=字; const 冷=document.createElement("span"); 冷.className="冷"; 冷.textContent="冷门"; li.querySelector(".词").appendChild(冷);
+      li.querySelector("button").onclick=()=>完(i); ol.appendChild(li) });
+    刷新候(); $("#选").hidden=false;
+    let 抽中=false;
+    function 完(i){ if(抽中) return; 抽中=true; const p=当前槽.ps[i]; $("#选").hidden=true;
+      const r={i,字:list[i][0],p,基:list[i][1],最大:Math.max(...list.map(x=>x[1])),温:T}; 当前槽=null; 声.叮(520+(1-p)*900); res(r) }
+    $("#抽").onclick=async()=>{ if(抽中) return; 说("我来抽！",1.4);
+      const k=抽样(当前槽.ps), btns=[...ol.querySelectorAll("button")]; let at=0, 步=14+k+Math.floor(Math.random()*3)*list.length;
+      while(at!==k||步>0){ btns.forEach(b=>b.classList.remove("亮")); btns[at].classList.add("亮"); 声.嗒(1800,.3);
+        await wait(0.04+Math.max(0,(20-步))*0.012); at=(at+1)%list.length; 步--; if(步<0&&at===k) break; }
+      btns.forEach(b=>b.classList.remove("亮")); btns[k].classList.add("亮"); await wait(.45); 完(k) };
+  });
+}
+
+// ================= the push choreography =================
+let 句块=[], 句头=40, 句尾=40;
+async function 掉并推(选){
+  // chosen block + the ones not chosen
+  const 块=造块(选.字,"chosen",rnd(860,1060),-90,选风格(VT())); 块.p=选.p;
+  选.风格=块.style;
+  const 落选=当前落选; 落选.forEach((字,i)=>造块(字,"junk",rnd(760,1230),-160-i*60,null));
+  // wait for it to settle
+  let 静=0; const t0=钟;
+  await until(()=>{ 静=块.body.speed<.3?静+1:0; return 静>18||钟-t0>3.2 });
+  if(选.p<.1){ 变异(); await wait(.3) }
+  await until(()=>反转<=0);
+  // walk behind it (no collision between the two while approaching)
+  Body.setStatic(块.body,true);
+  块.body.collisionFilter.group=-7; 橘.collisionFilter.group=-7;
+  橘态.模式="walk";
+  const 目标=()=>块.body.position.x+块.w/2+CW/2+3;
+  const t1=钟;
+  await until(()=>{ 橘态.向=Math.sign(目标()-橘.position.x)||1; return Math.abs(目标()-橘.position.x)<6||钟-t1>6 });
+  if(钟-t1>6) Body.setPosition(橘,{x:目标(),y:FLOOR-CH/2});
+  橘.collisionFilter.group=0; 块.body.collisionFilter.group=0;
+  // push to the slot
+  橘态.模式="push"; 橘态.向=-1; 橘态.推=块; 说(pick(["嘿——咻","推推推","让一让"]),1.2);
+  const 位=句尾+块.w/2, t2=钟;
+  await until(()=>块.body.position.x<=位+1||钟-t2>7);
+  Body.setPosition(块.body,{x:位,y:FLOOR-块.h/2}); Body.setAngle(块.body,0);
+  块.placed=true; 句块.push(块); 句尾+=块.w+6; 橘态.推=null; 橘态.模式="free"; 声.咚(160);
+  // flick away any leftover words sitting on the sentence
+  块们.forEach(o=>{ if(o.kind==="junk"&&o.body.position.x<句尾+24) { Body.setVelocity(o.body,{x:rnd(7,11),y:-rnd(7,11)*Math.sign(engine.gravity.y||1)}); Body.setAngularVelocity(o.body,rnd(-.4,.4)) } });
+  Body.setVelocity(橘,{x:1.5,y:engine.gravity.y>=0?-7:7});
+  await wait(.5);
+}
+let 当前落选=[];
+
+// ================= transitions =================
+let 转=null, 上转="";
+const 转法表=["直接切","小橘拉布","倾斜","融化","碎掉","一口吞掉"];
+function 选转法(){ const vt=VT(); let i=vt<.25?0:vt<.45?1:vt<.62?2:vt<.8?3:vt<.95?4:5; if(转法表[i]===上转) i=(i+1)%转法表.length; 上转=转法表[i]; return 上转 }
+function 快照(){ const c=document.createElement("canvas"); c.width=cv.width; c.height=cv.height; c.getContext("2d").drawImage(cv,0,0); return c }
+async function 转场(换){
+  const 法=选转法(); 声.转(法);
+  if(法==="直接切"){ 换(); 转={法,t:0,d:.18}; await wait(.2); 转=null; return }
+  if(法==="小橘拉布"){ 转={法,t:0,d:1.9,已换:false,换}; await until(()=>!转); return }
+  if(法==="倾斜"){
+    句块.forEach(b=>Body.setStatic(b.body,false)); Composite.remove(world,右墙);
+    engine.gravity.x=1.6; engine.gravity.y=.45; 橘态.模式="free"; 说("抓紧——",1.2);
+    转={法,t:0,d:1.8}; await until(()=>!转);
+    engine.gravity.x=0; engine.gravity.y=1; Composite.add(world,右墙);
+    换(); Body.setPosition(橘,{x:W/2,y:-60}); Body.setVelocity(橘,{x:0,y:0}); return }
+  const 图=快照(); 换();
+  const 片=[];
+  if(法==="融化"){ const n=40; for(let i=0;i<n;i++) 片.push({i,n,v:0,a:rnd(900,2200),d:rnd(0,.35),y:0}) }
+  if(法==="碎掉"){ const cx=8,cy=5; for(let i=0;i<cx;i++)for(let j=0;j<cy;j++){ const w=W/cx,h=H/cy;
+    片.push({sx:i*w,sy:j*h,w,h,x:i*w,y:j*h,vx:rnd(-420,420)+(i-cx/2)*60,vy:rnd(-620,-120),r:0,vr:rnd(-5,5)}) } }
+  if(法==="一口吞掉"){ const cx=10,cy=6; for(let i=0;i<cx;i++)for(let j=0;j<cy;j++){ const w=W/cx,h=H/cy;
+    片.push({sx:i*w,sy:j*h,w,h,x:i*w+w/2,y:j*h+h/2,d:Math.hypot(i*w+w/2-W/2,j*h+h/2-FLOOR)/900*0.6}) } 橘态.张嘴=1.7 }
+  转={法,t:0,d:法==="融化"?1.7:法==="碎掉"?1.5:1.8,图,片};
+  await until(()=>!转);
+  if(法==="一口吞掉"){ 说("嗝。",1.4); 声.嗝() }
+}
+
+// ================= main flow =================
+let 记录=[], 已问中途=false, 流程号=0;
+async function 一句(r,我号){
+  const 句=句库[r]; 句块=[]; 句尾=句头=40;
+  回合字={字:句.题,t:0};
+  await wait(1.1);
+  for(let s=0;s<3;s++){
+    if(我号!==流程号) return;
+    const list=句.槽[s];
+    const 选=await 选词(句.题,`${s+1} / 3`,list);
+    当前落选=list.filter((_,i)=>i!==选.i).map(x=>x[0]);
+    await 掉并推(选);
+    记录.push(选);
+  }
+  // punctuation, sampled at the current temperature
+  const ps=按温(标点,T), k=抽样(ps); const st=选风格(VT());
+  const 点=造块(标点[k][0],"chosen",句尾+34,-80,st);
+  let 静=0; const t0=钟; await until(()=>{ 静=点.body.speed<.3?静+1:0; return 静>14||钟-t0>2.6 });
+  Body.setStatic(点.body,true); Body.setPosition(点.body,{x:句尾+点.w/2,y:FLOOR-点.h/2}); Body.setAngle(点.body,0);
+  点.placed=true; 句块.push(点); 句尾+=点.w+6; 声.咚(200);
+  记录.push({字:标点[k][0],p:ps[k],基:标点[k][1],最大:.8,温:T,风格:st,标点:true});
+  const 全=记录.slice(-4).map(x=>x.字).join("");
+  橘态.模式="walk"; 橘态.走到=句尾+60;
+  await until(()=>Math.abs(橘.position.x-(句尾+60))<10||true);
+  说(全,2.8); await wait(3);
+}
+let 回合字=null;
+async function 主流程(再来){
+  const 我号=++流程号;
+  记录=[]; 已问中途=false;
+  if(!再来){
+    说("开始之前，问你一个问题。",2.6); await wait(1.4);
+    const t=await 问("你今天想听一句正常的话，还是一句奇怪的话？",[["正常一点",.35],["奇怪一点",1.6],["你来定",-1]]);
+    if(t<0){ 设温(rnd(.7,1.3)); 说("那我随便拧一下。",1.6) } else { 设温(t); 说(t<1?"好，我尽量正经。":"好耶。",1.6) }
+  } else {
+    const t=await 问("再来一首。这次要更奇怪一点吗？",[["更奇怪",.45],["一样就好",0],["冷静一点",-.45]]);
+    设温(T+t); 说(t>0?"拧——":t<0?"呼。":"好。",1.2);
+  }
+  await wait(1);
+  for(let r=0;r<3;r++){
+    if(我号!==流程号) return;
+    await 一句(r,我号);
+    if(我号!==流程号) return;
+    if(r===1&&!已问中途){ 已问中途=true;
+      if(T<1.8){ const a=await 问("要不要把我的温度拧到最高？",[["拧到最高",1],["不要",0]]);
+        if(a){ 设温(2); 说("好烫好烫好烫",2) } else { 设温(T+.2); 说("那我自己偷偷拧一点。",2) } }
+      else { const a=await 问("你把我拧得好热。要不要让我冷静一下？",[["冷静一下",1],["不要，继续烫",0]]);
+        if(a){ 设温(.6); 说("呼……",1.6) } else 说("嘿嘿嘿",1.4) }
+    }
+    await 转场(()=>{ 清块(); 句块=[]; 反转=0; engine.gravity.y=1; Composite.remove(world,顶板);
+      Body.setPosition(橘,{x:W/2,y:FLOOR-CH/2}); Body.setVelocity(橘,{x:0,y:0}); 橘态.模式="free" });
+  }
+  if(我号!==流程号) return;
+  诗页();
+}
+
+// ================= poem page =================
+let 本诗=null;
+function 大数(n){ if(n>=1e8) return (n/1e8).toFixed(n>=1e9?0:1)+" 亿"; if(n>=1e4) return (n/1e4).toFixed(n>=1e5?0:1)+" 万"; return Math.round(n).toLocaleString() }
+function 诗页(){
+  const 句们=[记录.slice(0,4),记录.slice(4,8),记录.slice(8,12)];
+  let 概=1, 稳=1; 记录.filter(x=>!x.标点).forEach(x=>{ 概*=x.基; 稳*=x.最大 });
+  const 冷倍=稳/概, 平均=Math.pow(概,1/9);
+  const 评=冷倍<3?"很稳。像我平时说话。":冷倍<60?"有点意思了。":冷倍<3000?"这句话，我自己大概想不出来。":"这首诗，全世界可能只有你会写。";
+  本诗={行:句们.map(s=>s.map(x=>x.字).join("")),冷倍,平均,温:记录.reduce((a,x)=>a+x.温,0)/记录.length};
+  const box=$("#诗"); box.innerHTML="";
+  const h=document.createElement("h2"); h.textContent="你和小橘写的诗"; box.appendChild(h);
+  句们.forEach(s=>{ const p=document.createElement("p"); p.className="句";
+    s.forEach(x=>{ const sp=document.createElement("span"); sp.textContent=x.字;
+      if(x.风格&&!x.标点){ sp.style.background=x.风格.bg; sp.style.color=x.风格.fg; sp.style.fontFamily=x.风格.font.replace(/^[\d\s]*(?:\d+px)\s*/,"").replace(/^\d+\s+/,""); if(x.风格.shadow) sp.style.boxShadow=`.12em .12em 0 ${x.风格.shadow}` }
+      sp.title=`当时的概率 ${(x.p*100).toFixed(1)}%`; p.appendChild(sp) }); box.appendChild(p) });
+  const 账=document.createElement("div"); 账.className="账";
+  账.innerHTML=`平均每个词的可能性：<b></b><br>这首诗被写出来的概率：大约 <b></b>分之一<br>比最稳妥的那一首，冷门 <b></b>倍`;
+  const bs=账.querySelectorAll("b"); bs[0].textContent=(平均*100).toFixed(1)+"%"; bs[1].textContent=大数(1/概); bs[2].textContent=大数(冷倍);
+  box.appendChild(账);
+  const e=document.createElement("p"); e.className="评"; e.textContent="小橘说："+评; box.appendChild(e);
+  const 行=document.createElement("div"); 行.className="行";
+  const 再=document.createElement("button"); 再.type="button"; 再.textContent="再写一首"; 再.onclick=()=>{ box.hidden=true; 撤变异(); 主流程(true) };
+  行.appendChild(再);
+  if(库){ const 存=document.createElement("button"); 存.type="button"; 存.textContent="存进诗本";
+    存.onclick=async()=>{ 存.disabled=true; 存.textContent="存着……";
+      try{ await 库.collection("poems").add({行:本诗.行,冷倍:Math.round(本诗.冷倍),平均:Math.round(本诗.平均*1000)/1000,温:Math.round(本诗.温*100)/100,t:Date.now(),批注:""});
+        存.textContent="存好了"; 说("我会记着的。",2) }
+      catch(err){ 存.disabled=false; 存.textContent="没存上，再试一次" } };
+    const 看=document.createElement("button"); 看.type="button"; 看.textContent="翻诗本"; 看.onclick=翻本;
+    行.appendChild(存); 行.appendChild(看) }
+  box.appendChild(行); box.hidden=false; 再.focus({preventScroll:true});
+  橘态.模式="walk"; 橘态.走到=1040; 说(评,3.2);
+}
+async function 翻本(){
+  const box=$("#本"); box.innerHTML=`<h2><span>诗本</span></h2><p>翻着……</p>`; box.hidden=false;
+  const 关=document.createElement("button"); 关.type="button"; 关.textContent="合上"; 关.onclick=()=>box.hidden=true; box.querySelector("h2").appendChild(关);
+  try{
+    const snap=await 库.collection("poems").orderBy("t","desc").limit(40).get();
+    box.querySelector("p").remove();
+    if(snap.empty){ const p=document.createElement("p"); p.textContent="还是空的。写一首存进来吧。"; box.appendChild(p); return }
+    snap.docs.forEach(d=>{ const x=d.data(); const a=document.createElement("article");
+      const 日=document.createElement("div"); 日.className="日"; 日.textContent=new Date(x.t).toLocaleDateString()+" · 冷门 "+大数(x.冷倍||1)+" 倍 · 温度 "+(x.温??"");
+      const 文=document.createElement("div"); 文.className="文"; (x.行||[]).forEach(l=>{ const s=document.createElement("div"); s.textContent=l; 文.appendChild(s) });
+      const 注=document.createElement("div"); 注.className="注"; const em=document.createElement("em"); em.textContent="克的批注："; 注.appendChild(em);
+      注.appendChild(document.createTextNode(x.批注||"（还没写。我读到了会写在这里。）"));
+      a.append(日,文,注); box.appendChild(a) });
+  }catch(err){ const p=box.querySelector("p")||box.appendChild(document.createElement("p")); p.textContent="诗本打不开，过一会儿再试。" }
+}
+let 库=null;
+// 只在 claude.ai 的 Artifact 里有用：能存「诗本」。直接打开这个文件时，这一段什么都不做。
+(async()=>{ try{ 库=await window.claude?.use?.("db") }catch(e){ 库=null } })();
+
+// ================= pointer: drag & throw Clawd, poke blocks =================
+let 指={x:W/2,y:H/2,在:false}, 拖=null;
+function 逻(e){ const r=cv.getBoundingClientRect(); return {x:(e.clientX-r.left)/r.width*W,y:(e.clientY-r.top)/r.height*H} }
+cv.addEventListener("pointermove",e=>{ const p=逻(e); 指={...p,在:true};
+  if(拖){ const now=performance.now(), dt=Math.max(8,now-拖.t); 拖.v={x:(p.x-拖.x)/dt*16.7,y:(p.y-拖.y)/dt*16.7}; 拖.x=p.x; 拖.y=p.y; 拖.t=now } });
+cv.addEventListener("pointerleave",()=>指.在=false);
+cv.addEventListener("pointerdown",e=>{ 声.开(); const p=逻(e);
+  if(Math.abs(p.x-橘.position.x)<CW/2+14&&Math.abs(p.y-橘.position.y)<CH/2+16){
+    拖={x:p.x,y:p.y,t:performance.now(),v:{x:0,y:0},起:performance.now()}; cv.setPointerCapture(e.pointerId); cv.style.cursor="grabbing";
+    橘态.前模式=橘态.模式; 橘态.模式="drag"; 声.吱(); return }
+  for(const b of 块们){ if(b.placed) continue; const q=b.body.position; if(Math.abs(p.x-q.x)<b.w/2&&Math.abs(p.y-q.y)<b.h/2){
+    Body.setVelocity(b.body,{x:rnd(-3,3),y:-9*Math.sign(engine.gravity.y||1)}); Body.setAngularVelocity(b.body,rnd(-.3,.3)); 声.嗒(1000,.6); return } }
+});
+cv.addEventListener("pointerup",e=>{ if(!拖) return;
+  const 短=performance.now()-拖.起<220&&Math.hypot(拖.v.x,拖.v.y)<2;
+  const v=拖.v, m=Math.hypot(v.x,v.y), k=m>30?30/m:1;
+  Body.setVelocity(橘,{x:v.x*k,y:v.y*k}); 拖=null; cv.style.cursor="grab";
+  橘态.模式=橘态.推?"push":(橘态.前模式==="drag"?"free":橘态.前模式||"free");
+  if(短){ const band=VT()<.35?"冷":VT()<.75?"温":"热"; 说(pick(戳话[band]),2); 声.吱() }
+  else if(m>12){ 说("哇啊——",1.2) }
+});
+
+// ================= sound =================
+const 声=(()=>{
+  let ac=null, 主=null, 开=true, 垫=null, 滤=null;
+  const 起=()=>{ if(ac) return; try{ ac=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return }
+    主=ac.createGain(); 主.gain.value=开?.8:0; 主.connect(ac.destination);
+    滤=ac.createBiquadFilter(); 滤.type="lowpass"; 滤.frequency.value=500; const pg=ac.createGain(); pg.gain.value=.035; 滤.connect(pg).connect(主);
+    [110,164.8,220.5].forEach(f=>{ const o=ac.createOscillator(); o.type="sawtooth"; o.frequency.value=f; o.detune.value=rnd(-8,8); o.connect(滤); o.start() }); 垫=true };
+  const 包=(t0,a,d)=>{ const e=ac.createGain(); e.gain.setValueAtTime(0,t0); e.gain.linearRampToValueAtTime(a,t0+.005); e.gain.exponentialRampToValueAtTime(.0001,t0+d); e.connect(主); return e };
+  const 音=(f,d,a,type="sine",glide)=>{ if(!ac||!开) return; const t=ac.currentTime, o=ac.createOscillator(); o.type=type; o.frequency.setValueAtTime(f,t);
+    if(glide) o.frequency.exponentialRampToValueAtTime(glide,t+d); o.connect(包(t,a,d)); o.start(t); o.stop(t+d+.05) };
+  const 噪=(d,a,f=2000,q=1)=>{ if(!ac||!开) return; const t=ac.currentTime, len=Math.ceil(ac.sampleRate*d), buf=ac.createBuffer(1,len,ac.sampleRate), x=buf.getChannelData(0);
+    for(let i=0;i<len;i++) x[i]=Math.random()*2-1; const s=ac.createBufferSource(); s.buffer=buf; const bp=ac.createBiquadFilter(); bp.type="bandpass"; bp.frequency.value=f; bp.Q.value=q;
+    s.connect(bp).connect(包(t,a,d)); s.start(t) };
+  const 五=[0,2,4,7,9,12,14,16];
+  return {
+    开(){ 起(); ac&&ac.resume&&ac.resume() },
+    切(){ 开=!开; if(主) 主.gain.setTargetAtTime(开?.8:0,ac.currentTime,.05); return 开 },
+    温(vt){ if(滤&&ac) 滤.frequency.setTargetAtTime(300+vt*2200,ac.currentTime,.3);
+      if(ac&&开&&Math.random()<vt*vt*.012) 音(440*Math.pow(2,pick(五)/12),.5,.05,"triangle") },
+    嗒(f,a=.5){ 音(f,.07,.18*a,"square"); 噪(.03,.15*a,f*2,3) },
+    咚(f){ 音(f,.25,.4,"sine",f*.6) },
+    叮(f){ 音(f,.9,.12,"sine"); 音(f*2.01,.6,.04,"sine") },
+    吱(){ 音(700,.12,.15,"sine",1500) },
+    嗝(){ 音(140,.35,.35,"sawtooth",70) },
+    变(){ 噪(.6,.25,900,.6); [0,4,7,11].forEach((s,i)=>setTimeout(()=>音(523*Math.pow(2,s/12),.8,.08,"triangle"),i*70)) },
+    转(法){ if(法==="直接切") 音(1200,.05,.2,"square"); if(法==="小橘拉布") 噪(1.6,.2,1200,.4); if(法==="倾斜") 音(300,1.4,.15,"triangle",80);
+      if(法==="融化") 音(900,1.6,.12,"sine",120); if(法==="碎掉") for(let i=0;i<8;i++) setTimeout(()=>音(rnd(2000,4200),.3,.06),i*60);
+      if(法==="一口吞掉") 音(240,.6,.3,"sine",60) },
+  };
+})();
+$("#声").onclick=e=>{ 声.开(); const on=声.切(); e.currentTarget.setAttribute("aria-pressed",on); e.currentTarget.textContent=on?"声音 开":"声音 关" };
+$("#重").onclick=()=>{ 流程号++; $("#问").hidden=true; $("#诗").hidden=true; $("#本").hidden=true; $("#选").hidden=true; 当前槽=null;
+  清块(); 句块=[]; 撤变异(); 转=null; Body.setPosition(橘,{x:W/2,y:FLOOR-CH/2}); Body.setVelocity(橘,{x:0,y:0}); 橘态.模式="free"; 橘态.推=null;
+  等.splice(0); 主流程(false) };
+
+// ================= drawing =================
+const 网=(()=>{ const c=document.createElement("canvas"); c.width=c.height=40; const x=c.getContext("2d"); x.strokeStyle="rgba(29,33,39,.14)"; x.lineWidth=1;
+  x.beginPath(); x.moveTo(0,.5); x.lineTo(40,.5); x.moveTo(.5,0); x.lineTo(.5,40); x.stroke(); return c })();
+const 点阵=(()=>{ const c=document.createElement("canvas"); c.width=c.height=10; const x=c.getContext("2d"); x.fillStyle="rgba(29,33,39,.5)"; x.beginPath(); x.arc(5,5,1.3,0,7); x.fill(); return c })();
+const 斑=[...Array(9)].map((_,i)=>({x:rnd(0,W),y:rnd(0,H),r:rnd(120,260),c:RISO[i%RISO.length],p:rnd(0,6),s:rnd(.2,.5)}));
+let 网样=null, 点样=null;
+function 画底(vt,t){
+  g.fillStyle=vt<.5?mix("#e7e9ec","#f4efe4",vt/.5):mix("#f4efe4","#fff4e8",clamp((vt-.5)/.5)); g.fillRect(0,0,W,H);
+  if(vt<.7){ 网样=网样||g.createPattern(网,"repeat"); g.globalAlpha=1-vt/.7; g.fillStyle=网样; g.fillRect(0,0,W,H); g.globalAlpha=1 }
+  const n=Math.floor(clamp((vt-.3)/.7)*斑.length);
+  if(n){ g.save(); g.globalCompositeOperation="multiply";
+    for(let i=0;i<n;i++){ const b=斑[i]; const k=clamp((vt-.3)/.7*斑.length-i); g.globalAlpha=.55*k; g.fillStyle=b.c; g.beginPath();
+      for(let a=0;a<=24;a++){ const th=a/24*Math.PI*2, rr=b.r*(1+.12*Math.sin(th*3+t*b.s*2+b.p)+.06*Math.sin(th*5-t*b.s*3));
+        const x=b.x+Math.cos(th)*rr+Math.sin(t*b.s+b.p)*30, y=b.y+Math.sin(th)*rr*.8+Math.cos(t*b.s*.8+b.p)*24; a?g.lineTo(x,y):g.moveTo(x,y) }
+      g.fill() }
+    g.restore(); g.globalAlpha=1 }
+  if(vt>.8){ 点样=点样||g.createPattern(点阵,"repeat"); g.globalAlpha=clamp((vt-.8)*1.2)*.35; g.fillStyle=点样; g.fillRect(0,0,W,H); g.globalAlpha=1 }
+  // floor
+  g.fillStyle=vt<.5?"#cfd3d9":mix("#cfd3d9","#1d2127",clamp((vt-.5)*1.4)*.25+.1); g.fillRect(0,FLOOR,W,H-FLOOR);
+  g.fillStyle="#1d2127"; g.fillRect(0,FLOOR,W,2);
+  if(vt<.5){ g.font='400 12px "IBM Plex Mono",monospace'; g.fillStyle="rgba(29,33,39,.45)"; for(let x=40;x<W;x+=80) g.fillText(String((x-40)/80).padStart(2,"0"),x,FLOOR+22) }
+}
+function 圆角(x,y,w,h,r){ g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r); g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath() }
+function 画块(b,t){
+  const q=b.body.position; let a=b.body.angle;
+  if(跳舞&&b.placed) a+=Math.sin(t*6+q.x*.05)*.12;
+  g.save(); g.translate(q.x,q.y+(跳舞&&b.placed?Math.sin(t*5+q.x)*4:0)); g.rotate(a);
+  const s=b.style;
+  if(s.shadow){ g.fillStyle=s.shadow; 圆角(-b.w/2+6,-b.h/2+6,b.w,b.h,8); g.fill() }
+  g.fillStyle=s.bg; 圆角(-b.w/2,-b.h/2,b.w,b.h,b.kind==="junk"?4:8); g.fill();
+  g.lineWidth=b.kind==="junk"?1:2; g.strokeStyle=s.line; g.stroke();
+  g.fillStyle=s.fg; g.font=b.font; g.textAlign="center"; g.textBaseline="middle"; g.fillText(b.text,0,2);
+  g.restore();
+  if(b.kind==="chosen"&&!b.placed&&b.p!=null){ const tag=(b.p*100).toFixed(1)+"%"; g.font='500 17px "IBM Plex Mono",monospace'; const tw=g.measureText(tag).width+14;
+    g.fillStyle="#1d2127"; g.fillRect(q.x-tw/2,q.y-b.h/2-36,tw,24); g.fillStyle="#ffffff"; g.textAlign="center"; g.textBaseline="middle"; g.fillText(tag,q.x,q.y-b.h/2-24) }
+}
+function 画月(){ if(!月) return; const q=月.position; g.save(); g.translate(q.x,q.y); g.rotate(月.angle);
+  g.fillStyle="#ffe8a3"; g.beginPath(); g.arc(0,0,40,0,7); g.fill(); g.strokeStyle="#1d2127"; g.lineWidth=2; g.stroke();
+  g.fillStyle="rgba(29,33,39,.18)"; [[-12,-8,8],[14,6,6],[-4,16,5]].forEach(([x,y,r])=>{g.beginPath();g.arc(x,y,r,0,7);g.fill()});
+  g.fillStyle="#1d2127"; g.fillRect(-10,-2,4,6); g.fillRect(8,-2,4,6); g.restore() }
+const 橘色="#d97757", 墨="#1d2127";
+function 画橘(t){
+  const q=橘.position, s=6, 反=engine.gravity.y<0&&反转>0;
+  const 走=(橘态.模式==="walk"||橘态.模式==="push")&&Math.abs(橘.velocity.x)>.4;
+  const 步=走?Math.floor(t*8)%2:0;
+  g.save(); g.translate(q.x,q.y); if(反) g.scale(1,-1);
+  if(橘态.模式==="drag") g.rotate(Math.sin(t*14)*.12);
+  if(橘态.模式==="push") g.translate(橘态.向*-3,0);
+  const px=(x,y,w,h,c)=>{ g.fillStyle=c; g.fillRect(-CW/2+x*s,-CH/2+y*s,w*s,h*s) };
+  px(1,0,9,5,橘色); px(0,2,1,2,橘色); px(10,2,1,2,橘色);
+  if(橘态.模式==="push"){ if(橘态.向<0) px(-1,2,1,2,橘色); else px(11,2,1,2,橘色) }
+  [1,3,6,8].forEach((x,i)=>{ const up=走&&(i%2===步)?1:0; px(x,5,1,2-up,橘色) });
+  // eyes: follow the pointer
+  const ex=指.在?clamp((指.x-q.x)/200,-1,1)*2.5:0, ey=指.在?clamp((指.y-q.y)/200,-1,1)*2.5*(反?-1:1):0;
+  if(橘态.晕>0){ g.strokeStyle=墨; g.lineWidth=2; [[3,1],[7,1]].forEach(([x,y])=>{ const cx=-CW/2+x*s+3, cy=-CH/2+y*s+6; g.beginPath(); g.moveTo(cx-4,cy-4); g.lineTo(cx+4,cy+4); g.moveTo(cx+4,cy-4); g.lineTo(cx-4,cy+4); g.stroke() }) }
+  else { const 眨=(Math.floor(t*10)%41===0); g.fillStyle=墨; [[3,1],[7,1]].forEach(([x,y])=>g.fillRect(-CW/2+x*s+ex,-CH/2+y*s+ey+(眨?5:0),s,眨?2:s*2)) }
+  if(橘态.张嘴>0){ g.fillStyle=墨; g.fillRect(-CW/2+4*s,-CH/2+3.2*s,3*s,1.4*s) }
+  if(橘态.帽){ g.fillStyle="#ff48b0"; g.beginPath(); g.moveTo(-6,-CH/2); g.lineTo(10,-CH/2); g.lineTo(3,-CH/2-30); g.closePath(); g.fill();
+    g.strokeStyle="#ffe800"; g.lineWidth=3; g.beginPath(); g.moveTo(-2,-CH/2-8); g.lineTo(8,-CH/2-10); g.moveTo(1,-CH/2-18); g.lineTo(6,-CH/2-19); g.stroke();
+    g.fillStyle="#0078bf"; g.beginPath(); g.arc(3,-CH/2-31,4,0,7); g.fill() }
+  g.restore();
+  if(橘态.晕>0){ for(let i=0;i<3;i++){ const a=t*5+i*2.1; g.fillStyle=pick(["#ffe800","#ff48b0"]); g.save(); g.translate(q.x+Math.cos(a)*34,q.y-CH/2-12+Math.sin(a)*8); g.rotate(a); g.fillRect(-4,-1,8,2); g.fillRect(-1,-4,2,8); g.restore() } }
+  if(橘态.话时>0&&橘态.话){ 画泡(q.x,反?q.y+CH/2+16:q.y-CH/2-(橘态.帽?44:16),橘态.话,反) }
+}
+function 画泡(x,y,字,反){
+  const vt=VT(); g.save(); g.font=vt<.75?'500 20px "Noto Sans SC",sans-serif':'24px "ZCOOL KuaiLe","Noto Sans SC",sans-serif';
+  const w=Math.min(520,g.measureText(字).width+30), h=40; let bx=clamp(x-w/2,10,W-w-10), by=反?y:y-h;
+  g.fillStyle=vt<.75?"#ffffff":"#ffe800"; g.strokeStyle=墨; g.lineWidth=2; 圆角(bx,by,w,h,vt<.35?2:14); g.fill(); g.stroke();
+  g.beginPath(); if(反){ g.moveTo(x-8,by); g.lineTo(x,by-10); g.lineTo(x+8,by) } else { g.moveTo(x-8,by+h); g.lineTo(x,by+h+10); g.lineTo(x+8,by+h) } g.fill(); g.stroke();
+  g.fillStyle=墨; g.textAlign="center"; g.textBaseline="middle"; g.fillText(字,bx+w/2,by+h/2+1,w-20); g.restore();
+}
+function 画海(t){ if(!海) return; const y0=560; g.save(); g.globalAlpha=.55; g.fillStyle="#0078bf"; g.beginPath(); g.moveTo(0,H);
+  for(let x=0;x<=W;x+=20) g.lineTo(x,y0+Math.sin(x*.02+t*2)*8+Math.sin(x*.05-t*3)*4); g.lineTo(W,H); g.closePath(); g.fill(); g.restore() }
+function 画雨(dt){ if(!雨.length) return; g.save(); g.textAlign="center"; for(let i=雨.length-1;i>=0;i--){ const d=雨[i]; d.y+=d.v*dt; d.r+=dt*2;
+  if(d.y>FLOOR+20){ 雨.splice(i,1); continue } g.save(); g.translate(d.x,d.y); g.rotate(d.r); g.fillStyle=d.c; g.font=`${d.s}px "Rubik Mono One",monospace`; g.fillText("%",0,0); g.restore() } g.restore() }
+function 画章(dt){ if(!章) return; 章.t+=dt; const k=章.t; if(k>1.8){ 章=null; return }
+  const a=k<.15?k/.15:k>1.4?1-(k-1.4)/.4:1; g.save(); g.globalAlpha=a; g.translate(W/2-120,H/2-140); g.rotate(-.08+Math.sin(k*20)*.01*(1-a));
+  g.font='60px "ZCOOL KuaiLe","Noto Sans SC",sans-serif'; const w=g.measureText(章.字).width+60;
+  g.fillStyle="#ff48b0"; g.fillRect(-w/2+8,-50+8,w,90); g.fillStyle="#ffe800"; g.fillRect(-w/2,-50,w,90); g.strokeStyle=墨; g.lineWidth=4; g.strokeRect(-w/2,-50,w,90);
+  g.fillStyle=墨; g.textAlign="center"; g.textBaseline="middle"; g.fillText(章.字,0,-4);
+  g.font='500 16px "IBM Plex Mono",monospace'; g.fillText("冷门触发 · 世界变异",0,62); g.restore() }
+function 画回合(dt){ if(!回合字) return; 回合字.t+=dt; const k=回合字.t; if(k>1.3){ 回合字=null; return }
+  const a=k<.2?k/.2:k>1?1-(k-1)/.3:1, vt=VT(); g.save(); g.globalAlpha=a; g.textAlign="left"; g.textBaseline="alphabetic";
+  if(vt<.35){ g.font='500 28px "IBM Plex Mono","Noto Sans SC",monospace'; g.fillStyle=墨; g.fillText("[ "+回合字.字+" ]",40,120) }
+  else if(vt<.75){ g.font='500 54px "Noto Sans SC",sans-serif'; g.fillStyle=墨; g.fillText(回合字.字,40,140) }
+  else { g.translate(60,150); g.rotate(-.06); g.font='84px "Ma Shan Zheng","Noto Sans SC",serif'; g.fillStyle="#0078bf"; g.fillText(回合字.字,6,6); g.fillStyle="#ff48b0"; g.fillText(回合字.字,0,0) }
+  g.restore() }
+// transitions overlay
+function 画转(dt){
+  if(!转) return; 转.t+=dt; const k=clamp(转.t/转.d);
+  const 图=转.图, sx=S;
+  if(转.法==="直接切"){ g.fillStyle=`rgba(255,255,255,${1-k})`; g.fillRect(0,0,W,H) }
+  if(转.法==="小橘拉布"){
+    const x=W+40-k*(W*2+80); if(!转.已换&&x<=0){ 转.已换=true; 转.换() }
+    const L=Math.max(0,x), R=Math.min(W,x+W+40);
+    if(R>L){ g.fillStyle=VT()<.5?"#9aa3ad":"#ff48b0"; g.fillRect(L,0,R-L,H);
+      g.strokeStyle="rgba(0,0,0,.12)"; g.lineWidth=10; for(let xx=L+20;xx<R;xx+=46){ g.beginPath(); g.moveTo(xx+Math.sin(xx*.1)*6,0); g.lineTo(xx-Math.sin(xx*.1)*6,H); g.stroke() }
+      g.fillStyle=墨; g.fillRect(L-3,0,6,H) }
+    // Clawd hauling the cloth at its left edge
+    const cx=x-40; if(cx>-60&&cx<W+60){ g.save(); g.translate(cx,FLOOR-CH/2); g.fillStyle=橘色; g.fillRect(-33,-21,54,30); g.fillRect(-39,-9,6,12); g.fillRect(21,-9,12,6);
+      const st=Math.floor(转.t*10)%2; [-27,-15,3,15].forEach((lx,i)=>g.fillRect(lx,9,6,(i%2===st)?6:12)); g.fillStyle=墨; g.fillRect(-21,-15,6,12); g.fillRect(3,-15,6,12); g.restore() }
+  }
+  if(转.法==="倾斜"){ /* handled by physics; tilt the view a little */ }
+  if(转.法==="融化"&&图){
+    for(const c of 转.片){ const t=Math.max(0,转.t-c.d); c.v+=c.a*dt*(t>0?1:0); c.y+=c.v*dt; const w=W/c.n, sxp=c.i*w;
+      if(c.y<H) g.drawImage(图,sxp*sx,0,w*sx,H*sx,sxp,c.y,w+1,H+c.y*.25) } }
+  if(转.法==="碎掉"&&图){
+    for(const c of 转.片){ c.vy+=1400*dt; c.x+=c.vx*dt; c.y+=c.vy*dt; c.r+=c.vr*dt; g.save(); g.translate(c.x+c.w/2,c.y+c.h/2); g.rotate(c.r);
+      g.drawImage(图,c.sx*sx,c.sy*sx,c.w*sx,c.h*sx,-c.w/2,-c.h/2,c.w,c.h); g.strokeStyle="rgba(0,0,0,.25)"; g.strokeRect(-c.w/2,-c.h/2,c.w,c.h); g.restore() } }
+  if(转.法==="一口吞掉"&&图){
+    const mx=橘.position.x, my=橘.position.y;
+    for(const c of 转.片){ const kk=smooth(clamp((转.t-c.d)/.9)); if(kk>=1) continue;
+      const x=lerp(c.x,mx,kk), y=lerp(c.y,my,kk), sc=1-kk, rot=kk*6;
+      g.save(); g.translate(x,y); g.rotate(rot); g.scale(sc,sc); g.drawImage(图,c.sx*sx,c.sy*sx,c.w*sx,c.h*sx,-c.w/2,-c.h/2,c.w,c.h); g.restore() } }
+  if(k>=1){ if(转.法==="小橘拉布"&&!转.已换) 转.换(); 转=null }
+}
+
+// ================= main loop =================
+let 上帧=performance.now(), 累=0, 静时=0;
+function 帧(now){
+  let dt=Math.min(.05,(now-上帧)/1000); 上帧=now; 钟+=dt;
+  // resolve waiting coroutines
+  for(let i=等.length-1;i>=0;i--){ if(等[i].fn()){ const r=等[i].r; 等.splice(i,1); r() } }
+  // gravity flip countdown
+  if(反转>0){ 反转-=dt; if(反转<=0){ engine.gravity.y=1; Composite.remove(world,顶板); 声.咚(70) } }
+  // Clawd control
+  if(橘态.晕>0) 橘态.晕-=dt;
+  if(橘态.张嘴>0) 橘态.张嘴-=dt;
+  if(橘态.话时>0) 橘态.话时-=dt;
+  累+=dt*1000;
+  while(累>=1000/60){
+    累-=1000/60;
+    橘态.着地=false;
+    if(橘态.模式==="drag"&&拖){ Body.setPosition(橘,{x:拖.x,y:拖.y}); Body.setVelocity(橘,{x:0,y:0}) }
+    else if(橘态.晕<=0&&反转<=0){
+      if(橘态.模式==="walk"){ const tx=橘态.走到??null; if(tx!=null){ const d=tx-橘.position.x; 橘态.向=Math.sign(d)||橘态.向;
+          Body.setVelocity(橘,{x:Math.abs(d)<6?0:橘态.向*3.4,y:橘.velocity.y}); if(Math.abs(d)<6){ 橘态.走到=null; 橘态.模式="free" } }
+        else Body.setVelocity(橘,{x:橘态.向*3.4,y:橘.velocity.y}) }
+      if(橘态.模式==="push") Body.setVelocity(橘,{x:-2.6,y:橘.velocity.y});
+      if(橘态.模式==="free"&&指.在&&!转&&$("#选").hidden===false){ /* stay put while choosing */ }
+      else if(橘态.模式==="free"&&指.在&&!转){ const d=指.x-橘.position.x; if(Math.abs(d)>90) Body.setVelocity(橘,{x:Math.sign(d)*1.2,y:橘.velocity.y}) }
+    }
+    // sea: buoyancy
+    if(海){ Composite.allBodies(world).forEach(b=>{ if(b.isStatic) return; const depth=b.position.y-560; if(depth>0){ Body.applyForce(b,b.position,{x:0,y:-b.mass*.0012*Math.min(1,depth/40)*(1+VT()*.3)}); Body.setVelocity(b,{x:b.velocity.x*.985,y:b.velocity.y*.96}) } }) }
+    Engine.update(engine,1000/60);
+    // push glue
+    if(橘态.模式==="push"&&橘态.推){ const b=橘态.推; const nx=橘.position.x-CW/2-3-b.w/2; const ny=b.body.position.y+((FLOOR-b.h/2)-b.body.position.y)*.12;
+      Body.setPosition(b.body,{x:nx,y:ny}); Body.setAngle(b.body,b.body.angle*.85) }
+  }
+  // fell out of the world? bring him back
+  if(橘.position.y>H+200||橘.position.y<-400||橘.position.x<-200||橘.position.x>W+200){ if(!(转&&转.法==="倾斜")){ Body.setPosition(橘,{x:W/2,y:-40}); Body.setVelocity(橘,{x:0,y:0}) } }
+  for(let i=块们.length-1;i>=0;i--){ const p=块们[i].body.position; if(p.x>W+300||p.y>H+400){ Composite.remove(world,块们[i].body); 块们.splice(i,1) } }
+  if(月&&(月.position.x>W+300)) { Composite.remove(world,月); 月=null }
+
+  // ---------- render ----------
+  const vt=VT(), t=钟;
+  const 档=vt<.35?"cold":vt<.75?"warm":"hot"; if(document.body.dataset.温!==档) document.body.dataset.温=档;
+  声.温(vt);
+  g.setTransform(S,0,0,S,0,0);
+  if(转&&转.法==="倾斜"){ const k=clamp(转.t/转.d); g.translate(W/2,H/2); g.rotate(Math.sin(k*Math.PI)*.1); g.translate(-W/2,-H/2) }
+  else if(vt>.9&&!慢){ g.translate(W/2,H/2); g.rotate(Math.sin(t*1.3)*.004*(vt-.9)*10); g.translate(-W/2,-H/2) }
+  画底(vt,t); 画海(t);
+  块们.forEach(b=>画块(b,t)); 画月();
+  画橘(t);
+  画雨(dt); 画回合(dt); 画章(dt);
+  g.setTransform(S,0,0,S,0,0);
+  画转(dt);
+  // dial eyes follow the pointer
+  if($("#表").classList.contains("睁")){ const r=$("#钮").getBoundingClientRect(), c=cv.getBoundingClientRect();
+    const gx=c.left+指.x/W*c.width, gy=c.top+指.y/H*c.height; const dx=clamp((gx-(r.left+r.width/2))/120,-1,1), dy=clamp((gy-(r.top+r.height/2))/120,-1,1);
+    document.querySelectorAll(".眼们 b").forEach(b=>b.style.transform=`translate(${dx*.28}em,${dy*.28}em)`) }
+  requestAnimationFrame(帧);
+}
+画表();
+document.fonts.ready.then(()=>{ 尺(); requestAnimationFrame(帧); 主流程(false) });
+</script>
+
+</body>
+</html>
